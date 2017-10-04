@@ -1,7 +1,11 @@
 \documentclass[a4paper]{article}
-\usepackage[brazil]{babel}  
+\usepackage[T1]{fontenc}
+\newcommand{\startunderscoreletter}{\catcode`_ 12}
+\newcommand{\stopunderscoreletter}{\catcode`_ 8}
 \usepackage[utf8]{inputenc}
+\usepackage{ltablex}
 \usepackage{graphicx}
+%\usepackage{mdframed}
 \usepackage{placeins}
 \usepackage{float}
 \usepackage{setspace}
@@ -16,18 +20,21 @@
 
 
 \begin{document}
+\startunderscoreletter  
 \begin{figure}[H]
 \includegraphics[width=1\textwidth,height=1.2\textheight,keepaspectratio]{fundoSE}
 %\FloatBarrier
 \end{figure}
 \begin{table}[h]
 \setstretch{2}
+%\resizebox{1.\textwidth}{!}{%
     \begin{tabular}{|p{16.55cm}|}
     \cline{1-2}
-    \setstretch{1.2} \centering RELATÓRIO DE DUPLA VERIFICAÇÃO - MÓDULOS SiTef\\
+    \setstretch{1.2} \centering RELATÓRIO DE DUPLA VERIFICAÇÃO – MÓDULOS SiTef\\
      D E C L A R A Ç Ã O 
     \cline{1-2}
     \end{tabular}%
+%}
 \end{table}%
 \newline
 \newline
@@ -59,11 +66,10 @@
 \end{table}%
 \newline
 \newline
-\begin{table}[htbp]
-\setstretch{1.8}
-\resizebox{1.\textwidth}{!}{%
-  \centering
-    \begin{tabular}{|l|l|p{15cm}|}
+\newline
+    \label{tab:daypack}
+\setstretch{1.5}
+    \begin{tabularx}{\linewidth}{|l|l|p{11.3cm}|}
     \cline{1-3}
     \multicolumn{3}{|c|}{
     \large Alterações (em relação à versão anterior)} \\
@@ -74,18 +80,16 @@
     \large Versão Interna} & 
     \multicolumn{1}{c|}{
     \large Descrição} \\
-    \cline{1-3} \large
+    \cline{1-3}
     CXX/XX/XXXX 
-    & \large
+    &
     CX.X.XX.XX 
-    &  \large
+    &
     -XXXXXXXXXX
     \\
     \cline{1-3}
-    \end{tabular}%
-}
-\end{table}%
-
+    %\bottomrule
+\end{tabularx}
 
 \begin{flushleft}
  Certifico que o módulo supramencionado foi conferido segundo as Regras e Padrões internos da Software Express para Desenvolvimento de Software e o mesmo encontra-se aderente aos padrões existentes na data.
@@ -93,14 +97,12 @@
 \newline
 \newline
 \newline
-\newline
-\newline
-\newline
+
 \end{flushleft}
 
 
 \begin{flushright}
-\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 Assinatura do responsável pela implementação do módulo
 \end{flushright}
@@ -110,9 +112,10 @@ Assinatura do responsável pela implementação do módulo
 \end{flushright}
 
 \begin{flushright}
-\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 Assinatura do responsável pela conferência
 \end{flushright}
+\stopunderscoreletter
 
-\end{document}
+\end{document} 
