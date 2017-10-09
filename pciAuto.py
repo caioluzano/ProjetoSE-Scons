@@ -1,7 +1,7 @@
 ﻿import sys
 import codecs
 
-def formataDocumento(logHg, texPCI, saidaPCI, modulo, versao, conferente):
+def formataDocumento(logHg, texPCI, saidaPCI, modulo, versao, conferente, fase):
 
     i = 0;
     from datetime import date
@@ -12,8 +12,15 @@ def formataDocumento(logHg, texPCI, saidaPCI, modulo, versao, conferente):
 
 
     for linha in modeloPci:
-
-        if   linha.find('VXX/XX/XXXXX') >= 0:
+   
+        if   linha.find('\\begin{document}') >=0:
+             saida.write(linha)
+             if fase == 0:          
+                 for linha in modeloPci:
+                     if linha.find('\\startunderscoreletter') >=0:
+                         saida.writelines(avaliaFases(logHg))
+                         break
+        elif linha.find('VXX/XX/XXXXX') >= 0:
              saida.write(hj)
         elif linha.find('XXXXXXXX.exe') >= 0:
              saida.write(modulo+'.exe')
@@ -34,42 +41,50 @@ def formataDocumento(logHg, texPCI, saidaPCI, modulo, versao, conferente):
 
     modeloPci.close()
     saida.close()
+    
+def avaliaFases(logHg):
 
+    log = open(logHg, 'r')
 
-def formataDocumentoSemVersao(logHg, texPCI, saidaPCI, modulo, conferente):
+    linha = ''
+    wLinha = []
+    cWarning = ["\\startunderscoreletter\n",
+                "\\begin{table}[h]\n",
+                "\\colorbox{yellow}{\n",
+                "\\begin{tabular}{p{16.3cm}}\n",
+                "\\centering\n ",
+                "WARNING! Este documento foi gerado com ",
+                "revisões DRAFT e/ou SECRET, utilize a ",
+                "opção Fase=1 para retirar este aviso.\n",
+                "\\end{tabular}%\n",
+                "}\n",
+                "\\end{table}%\n"]
 
-    i = 0;
-    from datetime import date
-    hj = date.today()
-    hj = hj.strftime("%d/%m/%Y")
-    modeloPci = open(texPCI, 'r')
-    saida = open(saidaPCI, 'w')
-
-
-    for linha in modeloPci:
-
-        if   linha.find('VXX/XX/XXXXX') >= 0:
-             saida.write(hj)
-        elif linha.find('XXXXXXXX.exe') >= 0:
-             saida.write(modulo+'.exe')
-        elif linha.find('VX.X.XX.XX') >= 0:
-             saida.write(pegaversao(logHg))
-        elif linha.find('CXXXXXXXXXX') >= 0:
-             saida.write(conferente)
-        elif linha.find('PXXXXXXXXXX') >= 0:
-             saida.write(pegaNome(logHg))
-        elif linha.find('CXX/XX/XXXX') >= 0:
-             saida.write(pegaDataCommit(logHg))
-        elif linha.find('CX.X.XX.XX') >= 0:
-             saida.write(pegaversao(logHg))
-        elif linha.find('-XXXXXXXXXX') >= 0:
-             saida.writelines(pegaDescriCommit(logHg))
-        else:
-             saida.write(linha)   
-
-    modeloPci.close()
-    saida.close()
-
+    for linha in log:
+        linha = linha.lower()
+        if (linha.find("phases(") >= 0):
+            if (linha.find("draft") >= 0 or linha.find("secret") >=0):
+                wLinha = cWarning
+                repr(wLinha)
+                print 'WARNING!'
+                print 'WARNING!'
+                print 'WARNING!'
+                print '================================================================================'
+                print '--------------------------------------------------------------------------------'
+                print ' WARNING! Este documento foi gerado com revisoes DRAFT e/ou SECRET, utilize a   '
+                print ' opcao Fase=1 para retirar este aviso                                           '
+                print '--------------------------------------------------------------------------------'
+                print '================================================================================'
+                print 'WARNING!'
+                print 'WARNING!'
+                print 'WARNING!'
+                log.close()
+                return wLinha
+            else:
+                wLinha = "\\startunderscoreletter\n"
+              
+    return wLinha
+    log.close()
 
 def pegaversao(logHg):
     log = open(logHg, 'r')
@@ -270,12 +285,18 @@ def pegaDescriCommit(logHg):
 #conferente = "Susan"
 
 if __name__ == "__main__":  
-    logHg = sys.argv[1]
-    texPci = sys.argv[2]
-    saidaPci = sys.argv[3]
-    modulo = sys.argv[4]
-    versao = sys.argv[5]
-    conferente = sys.argv[6]
+    #logHg = sys.argv[1]
+    logHg = 'saida.txt'
+    #texPCI = sys.argv[2]
+    texPCI = 'main.tex'
+    #saidaPCI = sys.argv[3]
+    saidaPCI = 'DRVCOM.tex'
+    #modulo = sys.argv[4]
+    modulo = 'DRVCOM'
+    #versao = sys.argv[5]
+    versao = '6.1.1.21'
+    #conferente = sys.argv[6]
+    conferente = 'Caio Luzano'
     formataDocumento(logHg, texPCI, saidaPCI, modulo, versao, conferente)
     
 

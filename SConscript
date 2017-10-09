@@ -11,6 +11,7 @@ env['parametro'] = ''
 env['log'] = ""
 env['modelo'] = ""
 env['saida'] = ""
+env['fase'] = ""
 env['modulo'] = ""
 env['versao'] = ""
 env['conferente'] = ""
@@ -55,20 +56,9 @@ def build_tex(target, source, env):
     modelo = 'main.tex'
     versao = pciAuto.pegaversao(log)
     if not conferente:
-        pciAuto.formataDocumento(log, modelo, (saida + versao + '.tex'), modulo, versao, pegaNome(arquivo))
+        pciAuto.formataDocumento(log, modelo, (saida + versao + '.tex'), modulo, versao, pegaNome(arquivo), fase)
     else:
-        pciAuto.formataDocumento(log, modelo, (saida + versao + '.tex'), modulo, versao, conferente)
-    DST = (os.environ.get('PCI') + '\\' + saida + versao + '.pdf')
-    if os.environ.get('PCI'):        
-        pdfOutput2 = env.Install(os.environ.get('PCI') + '\\', (saida + versao + '.pdf'))
-        #pdfOutput2 = env.PDF(target=[DST,(saida + versao + '.pdf')],source=(saida + versao + '.tex'))   
-        pdfOutput = env.PDF(target=(saida +'P'+ versao + '.pdf'),source=(saida + versao + '.tex'))   
-        Depends(pdfOutput, pdfOutput2)
-    
-    #pdfOutput = env.PDF(target=[DST,(saida + versao + '.pdf')],source=(saida + versao + '.tex'))
-    # copiaPDF = env.cArq(target=('../'),source=([str(pdfOutput),'saida.txt']))
-    # env.AlwaysBuild(copiaPDF)
-    
+        pciAuto.formataDocumento(log, modelo, (saida + versao + '.tex'), modulo, versao, conferente, fase)
     return None
 
 bld = Builder(action = build_tex,
@@ -76,29 +66,50 @@ bld = Builder(action = build_tex,
                      
 env.Append(BUILDERS = {'gTex' : bld})
 
-def copia_arq(target, source, env):
-    if os.environ.get('PCI'):
-        #saida = str(target[0])
-        log= str(source[1])
-        versao = pciAuto.pegaversao(log)
-        arq = 'Projeto SiTef - '+ modulo +' - ' + versao + '.pdf'
-        arq = str(arq)
-        arq = str(source[0])
-        prefixo = str(source[0])
-        prefixo = prefixo[:prefixo.find('\\')+1]
-        shutil.copy2( (prefixo+'\\'+arq), (os.environ.get('PCI') + '\\' + arq))
-    
+def gera_PDF(target, source, env):
+    log = str(source[0])
+    tex = str(source[1])
+    versao = pciAuto.pegaversao(log)
+    arq = tex + versao + '.pdf'
+    pdfOutput = env.PDF(target=(arq),source=(tex + versao + '.tex'))
+    env.AlwaysBuild(pdfOutput)
     return None
     
-bld3 = Builder(action = copia_arq,
+bld3 = Builder(action = gera_PDF,
                      src_suffix = '.txt',
                      suffix = '.pdf')
                     
-env.Append(BUILDERS = {'cArq': bld3})
+env.Append(BUILDERS = {'gPDF': bld3})
+
+def copia_pdf(target, source, env):
+    if os.environ.get('PCI'):
+        log = str(source[0])
+        nPDF = str(target[0])
+        nPDF = nPDF[:nPDF.find('.pdf')]
+        tex = nPDF
+        versao = pciAuto.pegaversao(log)
+        nPDF = nPDF + versao +'.pdf'
+        DST = os.environ.get('PCI')+"\\"#Projeto SiTef - drvcom - 6.1.1.21.pdf"
+        Instala1 = env.Install([''], nPDF)
+        Instala2 = env.Install([DST], nPDF)
+        env.Depends(Instala1, Instala2)
+    return None
+    
+bld4 = Builder(action = copia_pdf,
+                        src_suffix = '.txt',
+                        suffix = '.pdf')
+                    
+env.Append(BUILDERS = {'cPDF': bld4})
 
 if 'Documento' in ARGUMENTS: 
     parametro = ARGUMENTS.get("Documento")
     parametro = parametro.split(",")
+    
+    if 'Fase' in ARGUMENTS:
+        parametro = ARGUMENTS.get("Fase")
+        fase = parametro
+    else:
+        fase = 0
     
     if 'Conferente' in ARGUMENTS: 
         parametro = ARGUMENTS.get("Conferente")
@@ -135,17 +146,25 @@ if 'Documento' in ARGUMENTS:
     if 'Query' in ARGUMENTS: 
         parametro = ARGUMENTS.get("Query")
         versao = 'x.x.x.x'
-        comando = 'hg log --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\n\\n" -r ' + parametro+' > $TARGET'
+        comando = 'hg log --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n" -r ' + parametro+' > $TARGET'
         env.Command(target='saida.txt', source=None, action= comando )
     else:
         interRev = ''
         interRev = env.lRev('',str(comando[0]))
-        interRev = env.Command(target='saida.txt', source='interRev.txt', action= "for /f \"delims=\" %i in ('type $SOURCE') do hg log --template \"date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\n\\n\"  -r %i > $TARGET")
-        env.AlwaysBuild(interRev)
+        if env['PLATFORM'] == 'win32':
+            interRev = env.Command(target='saida.txt', source='interRev.txt', action= "for /f \"delims=\" %i in ('type $SOURCE') do hg log --template \"date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n\"  -r %i > $TARGET")
+            env.AlwaysBuild(interRev)
+        else:
+            interRev = env.Command(target='saida.txt', source='interRev.txt', action= "var=$(cat &SOURCE) | hg log --template \"date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n\"  -r $var > $TARGET")
+            #var = $(cat TST) | $var
+            env.AlwaysBuild(interRev)
     documento = env.gTex(target=('Projeto SiTef - '+ modulo +' - '), source='saida.txt')
-    #documento = env.gTex(target=('Projeto SiTef - '+ modulo +' - '), source='saida.txt')
-    #copiaPDF = env.cArq(target=('../'),source=('saida.txt'))
+    env.AlwaysBuild(documento)
+    geraPDF = env.gPDF(target=('Projeto SiTef - p'+ modulo +' - '),source=[('saida.txt'),documento])
+    copiaPDF = env.cPDF(target=('Projeto SiTef - '+ modulo +' - '),source=[('saida.txt'),geraPDF])
+    env.Depends(copiaPDF, geraPDF)
     Install("", "../placeins.sty")
     Install("", "../setspace.sty")
     Install("", "../ltablex.sty")
+    Install("", "../xcolor.sty")
     Install("", "../fundoSE.jpg")
