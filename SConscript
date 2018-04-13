@@ -9,6 +9,22 @@ sys.path.append(srcdir.abspath)
 
 import pciAuto
 
+def clean_mlstring(s):
+  return ' '.join(s.replace('\r', ' ').replace('\n', ' ').split())
+
+hgrevsetcfg = clean_mlstring('''
+--config "revsetalias.sitc=not ancestors('sitef-comum')"
+--config "revsetalias.sitrls=sort(grep(r'\A([\[\(]?\d\.[\d\.]+)') or tag('re:\d+\.\d+'),rev) and sitc"
+--config "revsetalias.sitv(v)=(grep(r'\A\(?\[?((5|6)\.\d+\.)?'##v##r'($| |\)|\]|\:|\n)') or tag('re:\A\(?\[?((5|6)\.\d+\.)?'##v##'($| |\)|\]|\:)'))"
+--config "revsetalias.doc(rlsrev, allrlsrev, finalfilter)=((ancestors(rlsrev))-ancestors(ancestors(parents(rlsrev)) and allrlsrev)) and finalfilter"
+--config "revsetalias.sitdoc(rlsrev)=doc(rlsrev, sitrls, sitc)"
+--config "revsetalias.sitdocv(v)=sitdoc(sitv(v))"
+''')
+
+hgtemplate = clean_mlstring('''
+  --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n"
+''')
+
 def mktpath(name,name_path):
   return os.path.join('$buildroot', 'docpci', name_path, name)
 
@@ -20,34 +36,11 @@ def pegaNome(file):
     nome = nome[:nome.find("<")]
     file.close()
     return nome
-    
 
 def formatVers(versao):
-    if len(versao) > 5:
-        versao = versao.split('.')
-        versao = versao [2] + '.' + versao[3]
+    while versao.count(".")>1:
+        versao= versao[versao.find('.')+1:]
     return versao
-
-def LerInterRev(target, source, env):
-    seg_rev = 0
-    target = str(target[0])
-    source= str(source[0])
-    arq = open(source,'r')
-    interRev = arq.read()
-    arq.close()
-    if (interRev.find(":") != interRev.rfind(":")):
-        interRev = interRev[:interRev.rfind(":")]
-        seg_rev = interRev[interRev.find(":")+1:]
-        seg_rev = int(float(seg_rev)) + 1
-    pri_rev = interRev[:interRev.find(":")]
-    interRev = pri_rev +':'+ str(seg_rev) + ' and ancestors('+pri_rev+') and not ancestors("sitef-comum")'
-    arq = open(target, 'w')
-    arq.writelines(interRev)
-    arq.close()
-    return None
-    
-bld1 = Builder(action = LerInterRev,
-               suffix = '.txt')
 
 def build_tex(target, source, env):
     
@@ -72,7 +65,7 @@ def build_tex(target, source, env):
         
     return None
 
-bld2 = Builder(action = build_tex,
+bld1 = Builder(action = build_tex,
               src_suffix = '.txt',
               suffix = '.tex')
 
@@ -107,121 +100,94 @@ def copia_pdf(target, source, env):
     
     return None
     
-bld3 = Builder(action = copia_pdf,
+bld2 = Builder(action = copia_pdf,
               src_suffix = '.txt',
               suffix = '.pdf')           
-              
-def clean_mlstring(s):
-  return ' '.join(s.replace('\r', ' ').replace('\n', ' ').split())
 
 def CriaDocPCI(env, nome_executavel, pasta_destino):
     
-    if 'fase' in ARGUMENTS:
-        parametro = ARGUMENTS.get("fase")
-        fase = parametro
-        env['dadosDoc'].fase = parametro
-    else:
-        fase = '0'
-        env['dadosDoc'].fase = '0'
+    fase = ARGUMENTS.get("fase", '0')
     
-    if 'modulo' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("modulo")
-        env['dadosDoc'].modulo = parametro
-    else:
-        env['dadosDoc'].modulo = nome_executavel
+    env['dadosDoc'].modulo = ARGUMENTS.get("modulo", nome_executavel)
     
     if env['PLATFORM'] == 'win32':
-      moduloeFase = env.Command(target=mktpath("moduloeFase.txt",env['dadosDoc'].modulo), source=None, action = 'echo {} > $TARGET'.format(fase+';'+env['dadosDoc'].modulo))
+        moduloeFase = env.Command(
+          target=mktpath("moduloeFase.txt",env['dadosDoc'].modulo),
+          source=None,
+          action = 'echo {} > $TARGET'.format(fase+';'+env['dadosDoc'].modulo))
     else:
-      moduloeFase = env.Command(target=mktpath("moduloeFase.txt",env['dadosDoc'].modulo), source=None, action = 'echo "{}" > $TARGET'.format(fase+';'+env['dadosDoc'].modulo))
+        moduloeFase = env.Command(
+          target=mktpath("moduloeFase.txt",env['dadosDoc'].modulo),
+          source=None,
+          action = 'echo "{}" > $TARGET'.format(fase+';'+env['dadosDoc'].modulo))
     
-    if 'conferente' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("conferente")
-        conferente = parametro
-        env['dadosDoc'].conferente = parametro
-        env['dadosDoc'].arquivo = env.Command(target=mktpath("nomehg.txt",env['dadosDoc'].modulo), source=moduloeFase, action = "echo {} > $TARGET".format(conferente))
+    conferente = ARGUMENTS.get("conferente", None)
+    if not conferente is None:
+        env['dadosDoc'].conferente = conferente
+        env['dadosDoc'].arquivo = env.Command(
+          target=mktpath("nomehg.txt",env['dadosDoc'].modulo),
+          source=moduloeFase,
+          action="echo {} > $TARGET".format(conferente))
     else:
-        env['dadosDoc'].arquivo = env.Command(target=mktpath("nomehg.txt",env['dadosDoc'].modulo), source=moduloeFase, action = "hg showconfig ui.username > $TARGET")
-        conferente = ""
+        env['dadosDoc'].arquivo = env.Command(
+          target=mktpath("nomehg.txt",env['dadosDoc'].modulo),
+          source=moduloeFase,
+          action="hg showconfig ui.username > $TARGET")
+        
         env['dadosDoc'].conferente = ""
     
-    if 'versao' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("versao")
+    env['dadosDoc'].modelo = ARGUMENTS.get("modelo", srcdir.File('main.tex').abspath)
+    
+    if 'assets' in ARGUMENTS: 
+        parametro = ARGUMENTS.get("assets")
+        env['dadosDoc'].assetsModelo = parametro
+        
+    parametro = ARGUMENTS.get("versao")
+    if not parametro is None:
         env['dadosDoc'].versao = parametro
         versaoF = formatVers(parametro)
-        interRev = env.Command(target=mktpath('interRev.txt',env['dadosDoc'].modulo), source=env['dadosDoc'].arquivo, action=(clean_mlstring('''
-        hg --config revsetalias.sitclean="not ancestors('sitef-comum')"
-        --config revsetalias.sitrelease="(grep(r'\A([\[\(]?\d\.[\d\.]+)') or tag('re:\d+\.\d+')) and sitclean"
-        --config "revsetalias.sitversion(v)=1::(grep(r'\A\(?\[?((5|6)\.\d+\.)?'##v##r'+[ |\)|\]|$]?$') or tag('re:((5|6)\.\d+\.)?'##v##'+[ |\)|\]|$]?$'))"
-        log --template "{rev}:" -r "last(((sitrelease) and (sitversion("''' +versaoF+ '''"))) ^ 0, 2)" > $TARGET''')))
+        action = 'hg log {} {} -r "{}(\'{}\')" > $TARGET'.format(hgrevsetcfg, hgtemplate, 'sitdocv' if '.' in parametro else 'sitdoc', versaoF)
     else:
         env['dadosDoc'].versao = 'x.x.x.x'
-        interRev = env.Command(target=mktpath('interRev.txt',env['dadosDoc'].modulo), source=env['dadosDoc'].arquivo, action=(clean_mlstring('''
-        hg --config revsetalias.sitclean="not ancestors('sitef-comum')" 
-        --config revsetalias.sitrelease="(grep(r'\A([\[\(]?\d\.[\d\.]+)') or tag('re:\d+\.\d+')) and sitclean" 
-        --config "revsetalias.sitversion(v)=1::(grep(r'\A\(?\[?((5|6)\.\d+\.)?'##v##r'+[ |\)|\]|$]?$') or tag('re:((5|6)\.\d+\.)?'##v##'+[ |\)|\]|$]?$'))" 
-        log --template "{rev}:" -r "last((sitrelease) ^ 0, 2)" > $TARGET''')))
-    if 'modelo' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("modelo")
-        env['dadosDoc'].modelo = parametro
-        if 'assets' in ARGUMENTS: 
-            parametro = ARGUMENTS.get("assets")
-            env['dadosDoc'].assetsModelo = parametro
-    else:
-        env['dadosDoc'].modelo = srcdir.File('main.tex').abspath
+        action = 'hg log {} {} -r "sitdocl" > $TARGET'.format(hgrevsetcfg, hgtemplate)
+        
+    log = env.Command(
+      target=mktpath('hglog.txt',env['dadosDoc'].modulo),
+      source=env['dadosDoc'].arquivo,
+      action=(action))
     
-    if 'query' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("query")
-        env['dadosDoc'].versao = 'x.x.x.x'
-        log = env.Command(target=mktpath('hglog.txt',env['dadosDoc'].modulo), source=interRev, action= 'hg log --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n" -r ' + parametro+' > $TARGET')
+    parametro = ARGUMENTS.get("query", None)
+    if not parametro is None:
+        log = env.Command(
+          target=mktpath('hglog.txt',env['dadosDoc'].modulo),
+          source=env['dadosDoc'].arquivo,
+          action=('hg log {} -r {} > $TARGET').format(hgtemplate, parametro))
+    
+    dupli = ARGUMENTS.get("dupli")
+    if not dupli is None:
+        log2 = env.Command(
+          target=mktpath("hglog2.txt",env['dadosDoc'].modulo),
+          source=log,
+          action = "echo {} > $TARGET".format(dupli))
     else:
-        interRev2 = env.lRev(mktpath('interRev2.txt',env['dadosDoc'].modulo), interRev)
-        if env['PLATFORM'] == 'win32':
-            log = env.Command(target=mktpath('hglog.txt',env['dadosDoc'].modulo), source=interRev2, action=(clean_mlstring('''
-            for /f \"delims=\" %i in ('type $SOURCE') do 
-            hg log --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n"  -r "%i" > $TARGET''')))
-        else:
-            log = env.Command(target=mktpath('hglog.txt',env['dadosDoc'].modulo), source=interRev2, action=(clean_mlstring('''
-            var=$(cat &SOURCE) | 
-            hg log --template "date({date|isodate})$\\nfiles({files})$\\ndesc({desc})$\\ntags({tags})$\\nauthor({author})$\\nparents({parents})$\\nphases({phase})$\\n\\n"  -r "$var" > $TARGET''')))
-     
-    if 'dupli' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("dupli")
-        dupli = parametro
-        log2 = env.Command(target=mktpath("hglog2.txt",env['dadosDoc'].modulo), source=log, action = "echo {} > $TARGET".format(dupli))
-    else:
-        dupli = '0'
-        log2 = env.Command(target=mktpath('hglog2.txt',env['dadosDoc'].modulo), source=log, action= (clean_mlstring('''
-        hg log --template "desc({desc})$\\ntags({tags})$\\ndate({date|shortdate})$\\n\\n" > $TARGET''')))
+        log2 = env.Command(
+          target=mktpath('hglog2.txt',env['dadosDoc'].modulo),
+          source=log,
+          action=('hg log --template "desc({desc})$\\ntags({tags})$\\ndate({date|shortdate})$\\n\\n" > $TARGET'''))
     
     env.AlwaysBuild(log2)
-    
+
     Documento = env.gTex(target=mktpath('Projeto SiTef - '+ env['dadosDoc'].modulo,env['dadosDoc'].modulo), source=[log,env['dadosDoc'].arquivo,env['dadosDoc'].modelo,moduloeFase,log2])
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('placeins.sty').abspath)
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('setspace.sty').abspath)
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('ltablex.sty').abspath)
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('placeins.sty').abspath)
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('xcolor.sty').abspath)
-    env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File('fundoSE.jpg').abspath)
+    
+    files = ['placeins.sty', 'setspace.sty', 'ltablex.sty', 'xcolor.sty', 'fundoSE.jpg']
+    for file in files:
+      env.Install(mktpath("",env['dadosDoc'].modulo), srcdir.File(file).abspath)
+    
     geraPDF = env.PDF(target=mktpath('Projeto SiTef - '+ env['dadosDoc'].modulo,env['dadosDoc'].modulo),source=(Documento))
     env['dadosDoc'].destino = pasta_destino
     copiaPDF = env.cPDF(target=mktpath(os.path.join('PDF','Projeto SiTef - '+ env['dadosDoc'].modulo),env['dadosDoc'].modulo),source=[geraPDF,log])
     env.Alias('docpci',copiaPDF)
     env.Alias('all','docpci')
-
-    if 'rangeversao' in ARGUMENTS: 
-        parametro = ARGUMENTS.get("rangeversao")
-        loopVersao = parametro.split(",")
-        env['dadosDoc'].modulo = nome_executavel
-        if env['PLATFORM'] == 'win32':
-            loopdeversao = env.Command(target=mktpath('Projeto SiTef - '+ env['dadosDoc'].modulo + '.txt',env['dadosDoc'].modulo), source=loopVersao, action=(clean_mlstring('''
-            for /f \"delims=\" %i in ('type $SOURCE') do 
-            scons -i docpci versao=\"%i\" > $TARGET''')))
-        else:
-            loopdeversao = env.Command(target=mktpath('Projeto SiTef - '+ env['dadosDoc'].modulo + '.txt',env['dadosDoc'].modulo), source=loopVersao, action=(clean_mlstring('''
-            var=$(cat &SOURCE) | 
-            scons -i docpci versao=\"%i\" > $TARGET''')))
-        env.Default(loopdeversao)
 
 def docpci(env):
     safadeza = env.Clone(ENV = os.environ)
@@ -246,19 +212,19 @@ def docpci(env):
       for t in tools:
         SCons.Tool.Tool(t)._tool_module().generate(env)
     
-    class dadosDoc:
-        versao = ''
-        modelo = ''
-        modulo = ''
-        arquivo = ''
-        destino = ''
-        assetsModelo = ''
+    class dadosDoc(object):
+        def __init__(self):
+            self.versao = ''
+            self.modelo = ''
+            self.modulo = ''
+            self.arquivo = ''
+            self.destino = ''
+            self.assetsModelo = ''
         
-    env.Prepend(dadosDoc = dadosDoc)
+    env.Prepend(dadosDoc = dadosDoc())
       
-    env.Append(BUILDERS = {'lRev': bld1})
-    env.Append(BUILDERS = {'gTex': bld2})
-    env.Append(BUILDERS = {'cPDF': bld3})
+    env.Append(BUILDERS = {'gTex': bld1})
+    env.Append(BUILDERS = {'cPDF': bld2})
     env.AddMethod(CriaDocPCI)
     env.AddMethod(CriaDocPCI,"nome_docpci")
 

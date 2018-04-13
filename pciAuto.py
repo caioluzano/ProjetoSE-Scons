@@ -200,7 +200,10 @@ def pegaNome(logHg):
     for linha in log:
 
         if (linha.find("author(") >= 0):
-            nome = linha[linha.find("author(")+7:linha.find("<")]
+            if linha.find("<")>0:
+                nome = linha[linha.find("author(")+7:linha.find("<")]
+            else:
+                nome = linha[linha.find("author(")+7:linha.find(")$")]
             log.close()
             return nome
     
